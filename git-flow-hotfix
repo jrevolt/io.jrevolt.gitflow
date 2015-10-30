@@ -179,6 +179,9 @@ cmd_start() {
 	# create branch
 	git_do checkout -b "$BRANCH" "$BASE"
 
+	# push
+	git_do push "$ORIGIN" "$BRANCH"
+
 	echo
 	echo "Summary of actions:"
 	echo "- A new branch '$BRANCH' was created, based on '$BASE'"
