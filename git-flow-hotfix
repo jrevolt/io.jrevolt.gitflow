@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 #
 # git-flow -- A collection of Git extensions to provide high-level
 # repository operations for Vincent Driessen's branching model.
@@ -294,7 +295,7 @@ cmd_finish() {
 			[ "$FLAGS_signingkey" != "" ] && opts="$opts -u '$FLAGS_signingkey'"
 			[ "$FLAGS_message" != "" ] && opts="$opts -m '$FLAGS_message'"
 			[ "$FLAGS_messagefile" != "" ] && opts="$opts -F '$FLAGS_messagefile'"
-			eval git_do tag $opts "$VERSION_PREFIX$VERSION" "$BRANCH" || \
+			eval git_do tag $opts "$tagname" "$MASTER_BRANCH" || \
 			die "Tagging failed. Please run finish again to retry."
 		fi
 	fi
@@ -302,19 +303,27 @@ cmd_finish() {
 	# try to merge into develop
 	# in case a previous attempt to finish this release branch has failed,
 	# but the merge into develop was successful, we skip it now
-	if ! git_is_branch_merged_into "$BRANCH" "$DEVELOP_BRANCH"; then
+	if ! git_is_branch_merged_into "$MASTER_BRANCH" "$DEVELOP_BRANCH"; then
 		git_do checkout "$DEVELOP_BRANCH" || \
 		  die "Could not check out $DEVELOP_BRANCH."
 
+		local mergeref="$MASTER_BRANCH"
+		if noflag notag; then
+			mergeref="$tagname"
+		fi
+
 		# TODO: Actually, accounting for 'git describe' pays, so we should
 		# ideally git merge --no-ff $tagname here, instead!
-		git_do merge --no-ff "$BRANCH" || \
+		git_do merge --no-ff "$mergeref" || \
 		  die "There were merge conflicts."
 		  # TODO: What do we do now?
 	fi
 
 	# delete branch
 	if noflag keep; then
+		if [ "$BRANCH" = "$(git_current_branch)" ]; then
+			git_do checkout "$MASTER_BRANCH"
+		fi
 		git_do branch -d "$BRANCH"
 	fi
 
@@ -327,6 +336,8 @@ cmd_finish() {
 			git_do push --tags "$ORIGIN" || \
 				die "Could not push tags to $ORIGIN."
 		fi
+		git_do push "$ORIGIN" :"$BRANCH" || \
+			die "Could not delete the remote $BRANCH in $ORIGIN."
 	fi
 
 	echo
@@ -334,7 +345,7 @@ cmd_finish() {
 	echo "- Latest objects have been fetched from '$ORIGIN'"
 	echo "- Hotfix branch has been merged into '$MASTER_BRANCH'"
 	if noflag notag; then
-		echo "- The hotfix was tagged '$VERSION_PREFIX$VERSION'"
+		echo "- The hotfix was tagged '$tagname'"
 	fi
 	echo "- Hotfix branch has been back-merged into '$DEVELOP_BRANCH'"
 	if flag keep; then
@@ -344,6 +355,7 @@ cmd_finish() {
 	fi
 	if flag push; then
 		echo "- '$DEVELOP_BRANCH', '$MASTER_BRANCH' and tags have been pushed to '$ORIGIN'"
+		echo "- Hotfix branch '$BRANCH' in '$ORIGIN' has been deleted."
 	fi
 	echo
 }
